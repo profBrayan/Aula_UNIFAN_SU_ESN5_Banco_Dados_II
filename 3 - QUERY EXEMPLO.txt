@@ -1,0 +1,111 @@
+select distinct
+		dmat.codigo as coddoc ,
+	    	ue.nome::text as "Unidade de Ensino",
+		cur.nome as "Curso",
+		   (
+			select
+			(mp1.semestre::text || '/' || mp1.ano::text ||' - '||periodoletivomatricula.descricao::text)
+			 from matriculaperiodo mp1
+			 inner join turma on turma.codigo = mp1.turma
+			 inner join matricula  m on m.matricula = mp1.matricula
+			 inner join curso on m.curso = curso.codigo
+			 inner join pessoa on m.aluno = pessoa.codigo
+			 inner join periodoletivo as periodoletivomatricula on mp1.periodoletivomatricula = periodoletivomatricula.codigo
+			 where mp1.matricula = dmat.matricula 
+			 order by mp1.ano desc , mp1.semestre desc ,periodoletivomatricula.descricao desc
+			 limit 1
+					   ) as "Periodo Letivo" ,
+	tur.identificadorturma as "Turma" ,
+	alu.nome::text as "Aluno" ,
+	lower(alu.email::text) as "E-mail" ,
+	m.matricula as "Matricula" ,
+	m."data" :: date as "Data_Matricula",
+	m.situacao as "Situação Aluno",
+	mp.situacaomatriculaperiodo as "Situação Matricula",
+	doc.nome as "Documento",
+	case
+		when dmat.dataentrega is not null THEN 'ENVIADO'
+		else 'NÃO ENVIADO'
+	end as "Status Doc.",
+	case
+		when dmat.entregue = false and dmat.arquivo is null and dmat.arquivoassinado is null and dmat.dataentrega is null
+			and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is null and dmat.situacao = 'PE' THEN 'PENDENTE'
+		when dmat.entregue = false and dmat.arquivo is not null and dmat.arquivoassinado is null and dmat.dataentrega is not null
+			and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is null and dmat.situacao = 'PE' THEN 'PENDENTE DE APROVAÇÃO'
+		when dmat.entregue = false and dmat.arquivo is null and dmat.arquivoassinado is null and dmat.dataentrega is null
+			and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is not null and dmat.situacao = 'PE' THEN 'DOCUMENTO REJEITADO'
+		when dmat.entregue = true and dmat.arquivo is null and dmat.arquivoassinado is not null and dmat.dataentrega is not null
+			and dmat.dataaprovacaodocdep is not null and dmat.respnegardocdep is null and dmat.situacao = 'OK' THEN 'ENTREGUE'
+		else 'VERIFICAR ERRO'
+	end as "Situação Doc.",
+	dmat.dataentrega as "Data Entrega",
+	dmat.respaprovacaodocdep as "Codigo Func",
+    	fun.nome                    as "Responsável Aprovação",
+       dmat.dataaprovacaodocdep    as "Data Aprovação",
+       fun2.nome                    as "Responsável Aprovação doc departamento"
+from documetacaomatricula  dmat
+		inner join tipodocumento doc on (dmat.tipodedocumento = doc.codigo)
+		inner join matriculaperiodo mp on (mp.matricula = dmat.matricula)
+		inner join matricula m on (mp.matricula = m.matricula)
+		inner join turma tur on (mp.turma = tur.codigo)
+		inner join curso cur on (tur.curso = cur.codigo)
+		inner join unidadeensino ue on (tur.unidadeensino = ue.codigo)
+		inner join pessoa alu on (m.aluno = alu.codigo)
+         left join usuario usu on (usu.codigo = dmat.usuario)
+         left join pessoa fun on (fun.codigo = usu.pessoa)
+         left join usuario usu2 on (usu2.codigo = dmat.respaprovacaodocdep)
+         left join pessoa fun2 on (fun2.codigo = usu2.pessoa)
+	where cur.niveleducacional in('SU', 'GT') limit 100
+union
+select distinct dmat.codigo                 as coddoc,
+       ue.nome::text               as "Unidade de Ensino",
+       cur.nome                    as "Curso",
+       tur.identificadorturma      as "Turma",
+       alu.nome::text              as "Aluno",
+       lower(alu.email::text)      as "E-mail",
+       m.matricula                 as "Matricula",
+       m."data" :: date            as "Data_Matricula",
+       m.situacao                  as "Situação Aluno",
+       mp.situacaomatriculaperiodo as "Situação Matricula",
+       doc.nome                    as "Documento",
+       case
+           when dmat.dataentrega is not null THEN 'ENVIADO'
+           else 'NÃO ENVIADO'
+           end                     as "Status Doc.",
+       case
+           when dmat.entregue = false and dmat.arquivo is null and dmat.arquivoassinado is null and
+                dmat.dataentrega is null
+               and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is null and dmat.situacao = 'PE'
+               THEN 'PENDENTE'
+           when dmat.entregue = false and dmat.arquivo is not null and dmat.arquivoassinado is null and
+                dmat.dataentrega is not null
+               and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is null and dmat.situacao = 'PE'
+               THEN 'PENDENTE DE APROVAÇÃO'
+           when dmat.entregue = false and dmat.arquivo is null and dmat.arquivoassinado is null and
+                dmat.dataentrega is null
+               and dmat.dataaprovacaodocdep is null and dmat.respnegardocdep is not null and
+                dmat.situacao = 'PE' THEN 'DOCUMENTO REJEITADO'
+           when dmat.entregue = true and dmat.arquivo is null and dmat.arquivoassinado is not null and
+                dmat.dataentrega is not null
+               and dmat.dataaprovacaodocdep is not null and dmat.respnegardocdep is null and
+                dmat.situacao = 'OK' THEN 'ENTREGUE'
+           else 'VERIFICAR ERRO'
+           end                     as "Situação Doc.",
+       dmat.dataentrega            as "Data Entrega",
+       dmat.respaprovacaodocdep    as "Codigo Func",
+       fun.nome                    as "Responsável Aprovação",
+       dmat.dataaprovacaodocdep    as "Data Aprovação",
+       fun2.nome                    as "Responsável Aprovação doc departamento"
+from documetacaomatricula dmat
+         inner join tipodocumento doc on (dmat.tipodedocumento = doc.codigo)
+         inner join matriculaperiodo mp on (mp.matricula = dmat.matricula)
+         inner join matricula m on (mp.matricula = m.matricula)
+         inner join turma tur on (mp.turma = tur.codigo)
+         inner join curso cur on (tur.curso = cur.codigo)
+         inner join unidadeensino ue on (tur.unidadeensino = ue.codigo)
+         inner join pessoa alu on (m.aluno = alu.codigo)
+         left join usuario usu on (usu.codigo = dmat.usuario)
+         left join pessoa fun on (fun.codigo = usu.pessoa)
+         left join usuario usu2 on (usu2.codigo = dmat.respaprovacaodocdep)
+         left join pessoa fun2 on (fun2.codigo = usu2.pessoa)
+where cur.niveleducacional in ('PO')  limit 100;
